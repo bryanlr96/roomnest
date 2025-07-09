@@ -1,18 +1,18 @@
 import { hashPassword, comparePassword } from '../../utils/passwordUtils.js';
 import { createPool } from '../../config/dbConfig.js'; // Ahora importamos createPool
+import { v4 as uuidv4 } from 'uuid';
 
 const pool = createPool(); // Creamos el pool una vez
 
 
 export class HttpModel {
 
-    static async login({ email, pass }) {
+    static async login({ email, password }) {
         const connection = await pool.getConnection(); // Obtener una conexión del pool
 
         try {
-            // Buscar el usuario
             const [users] = await connection.query(
-                `SELECT id, email, password, name, dni FROM users WHERE email = ?;`,
+                `SELECT id, email, password, name, dni, last_connection_type FROM users WHERE email = ?;`,
                 [email]
             );
 
@@ -21,35 +21,37 @@ export class HttpModel {
             }
 
             const user = users[0];
-            const isMatch = await comparePassword(pass, user.password);
+            const isMatch = await comparePassword(password, user.password);
 
             if (!isMatch) {
                 return { success: false, message: "Contraseña incorrecta" };
             }
 
-            delete user.password; // Nunca devolver el password
-
-            // Buscar el perfil del usuario
             const [profiles] = await connection.query(
                 `SELECT * FROM profile WHERE id_user = ?;`,
                 [user.id]
             );
+            const profile = profiles.length > 0 ? profiles[0] : {};
 
-            const profile = profiles.length > 0 ? profiles[0] : null;
+            const [rooms] = await connection.query(
+                `SELECT * FROM room WHERE user_id = ?;`,
+                [user.id]
+            );
+            const userRooms = rooms.length > 0 ? rooms : [];
 
-            return { success: true, user, profile };
+            return { success: true, user, profile, rooms: userRooms };
 
         } catch (error) {
             console.error('Error en la consulta de usuario:', error);
             return { success: false, message: "Error interno del servidor" };
         } finally {
-            connection.release(); // Liberar la conexión
+            connection.release();
         }
     }
 
 
     // Función para crear un nuevo usuario
-    static async register({ email, pass, name, dni }) {
+    static async register({ email, password, name, dni, last_connection_type }) {
         const connection = await pool.getConnection();
 
         try {
@@ -72,17 +74,17 @@ export class HttpModel {
             }
 
             // Hashear la contraseña
-            const hashedPassword = await hashPassword(pass)
+            const hashedPassword = await hashPassword(password)
 
             // Insertar nuevo usuario
             await connection.execute(
-                "INSERT INTO users (id, email, password, name, dni) VALUES (UUID(), ?, ?, ?, ?);",
-                [email, hashedPassword, name, dni]
+                "INSERT INTO users (id, email, password, name, dni, last_connection_type) VALUES (UUID(), ?, ?, ?, ?, ?);",
+                [email, hashedPassword, name, dni, last_connection_type]
             )
 
             // Traer el usuario recién creado para devolverlo
             const [users] = await connection.query(
-                "SELECT id, email, name, dni FROM users WHERE email = ?;",
+                "SELECT id, email, name, dni, last_connection_type FROM users WHERE email = ?;",
                 [email]
             )
 
@@ -99,7 +101,7 @@ export class HttpModel {
 
     // actualizar el usuario
     static async updateUser(user) {
-        const { id, email, name, pass } = user;
+        const { id, email, name, password } = user;
         const connection = await pool.getConnection();
 
         try {
@@ -129,8 +131,8 @@ export class HttpModel {
                 updateFields.push('name = ?');
                 updateValues.push(name);
             }
-            if (pass) {
-                const hashedPass = await hashPassword(pass);
+            if (password) {
+                const hashedPass = await hashPassword(password);
                 updateFields.push('password = ?');
                 updateValues.push(hashedPass);
             }
@@ -162,7 +164,7 @@ export class HttpModel {
     }
 
     // crear perfil
-    static async createProfile({ id_user, birthdate, situation, gender, children }) {
+    static async createProfile({ id_user, birthdate, situation, gender, children, province }) {
         const connection = await pool.getConnection();
 
         try {
@@ -189,10 +191,10 @@ export class HttpModel {
             // Insertar perfil nuevo
             await connection.execute(
                 `
-          INSERT INTO profile (id, id_user, birthdate, situation, gender, children)
-          VALUES (UUID(), ?, ?, ?, ?, ?);
+          INSERT INTO profile (id, id_user, birthdate, situation, gender, children, province)
+          VALUES (UUID(), ?, ?, ?, ?, ?,?);
         `,
-                [id_user, birthdate, situation, gender, children]
+                [id_user, birthdate, situation, gender, children, province]
             );
 
             // Traer el perfil recién creado
@@ -240,7 +242,7 @@ export class HttpModel {
                 'situation',
                 'gender',
                 'children',
-
+                'provience',
                 // Campos de convivencia
                 'smoker', 'pets', 'only_girls', 'only_boys', 'lgbt_friendly',
                 'calm_environment', 'party_friendly',
@@ -290,5 +292,242 @@ export class HttpModel {
         }
     }
 
+
+    // Crear una habitación
+    static async createRoom(roomData) {
+        const {
+            user_id,
+            municipality,
+            street,
+            floor,
+            cp,
+            price,
+            meters,
+            tenants
+        } = roomData;
+
+        const connection = await pool.getConnection();
+        const newRoomId = uuidv4();
+        try {
+            // Generar un UUID para la nueva habitación
+            const [result] = await connection.execute(
+                `INSERT INTO room 
+                (id, user_id, municipality, street, floor, cp, price, meters, tenants)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    newRoomId,
+                    user_id,
+                    municipality,
+                    street,
+                    floor,
+                    cp,
+                    price,
+                    meters,
+                    tenants
+                ]
+            );
+
+            // Obtener la habitación recién creada
+            const [room] = await connection.query(
+                `SELECT * FROM room WHERE id = ?`,
+                [newRoomId]
+            );
+
+            // Obtener todas las habitaciones del usuario
+            const [rooms] = await connection.query(
+                `SELECT * FROM room WHERE user_id = ?`,
+                [user_id]
+            );
+
+            return {
+                success: true,
+                room: room[0],
+                rooms: rooms || []
+            };
+
+        } catch (error) {
+            console.error('Error en HttpModel.createRoom:', error);
+            return {
+                success: false,
+                message: 'Error al crear la habitación'
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+
+    static async updateRoom(updatedRoom) {
+        const {
+            id,
+            user_id,
+            municipality,
+            street,
+            floor,
+            cp,
+            meters,
+            active_room, // lo excluimos de editable
+            ...restFields
+        } = updatedRoom;
+
+        const connection = await pool.getConnection();
+
+        try {
+            const [rooms] = await connection.query(
+                'SELECT * FROM room WHERE id = ?',
+                [id]
+            );
+
+            if (rooms.length === 0) {
+                return { success: false, message: "Habitación no encontrada" };
+            }
+
+            const allowedFields = [
+                'price',
+                'tenants',
+                'smoker', 'pets', 'only_girls', 'only_boys', 'lgbt_friendly',
+                'calm_environment', 'party_friendly',
+                'admit_couples', 'admit_minors', 'air_conditioning', 'padron',
+                'furnished', 'elevator', 'private_bathroom',
+                'double_room', 'single_room', 'heating', 'professional_cleaning',
+                'street_view', 'balcony'
+            ];
+
+            const updateFields = [];
+            const updateValues = [];
+
+            for (const field of allowedFields) {
+                if (restFields[field] !== undefined) {
+                    updateFields.push(`${field} = ?`);
+                    updateValues.push(restFields[field]);
+                }
+            }
+
+            if (updateFields.length === 0) {
+                return { success: false, message: "No hay campos para actualizar" };
+            }
+
+            updateValues.push(id);
+
+            await connection.execute(
+                `UPDATE room SET ${updateFields.join(', ')} WHERE id = ?`,
+                updateValues
+            );
+
+            const [updatedRoom] = await connection.query(
+                `SELECT * FROM room WHERE id = ?`,
+                [id]
+            );
+
+            const userIdFromRoom = updatedRoom[0].user_id;
+
+            const [updatedRooms] = await connection.query(
+                `SELECT * FROM room WHERE user_id = ?`,
+                [userIdFromRoom]
+            );
+
+            return { success: true, room: updatedRoom[0], rooms: updatedRooms };
+
+        } catch (error) {
+            console.error('Error actualizando habitación:', error);
+            return { success: false, message: "Error interno del servidor" };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // antes de enviar el like se comprueba que existan los ids
+    static async checkIdExists(id) {
+        const connection = await pool.getConnection();
+        try {
+            const [rows] = await connection.query(
+                `SELECT 1 FROM profile WHERE id = ? 
+         UNION 
+         SELECT 1 FROM room WHERE id = ?`,
+                [id, id]
+            );
+            return rows.length > 0;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // metodo para enviar likes
+    static async insertLike(id_emisor, id_receptor) {
+        const connection = await pool.getConnection();
+        try {
+            await connection.execute(
+                'INSERT INTO likes (id_emisor, id_receptor) VALUES (?, ?)',
+                [id_emisor, id_receptor]
+            );
+            return true;
+        } catch (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                return false; // Ya existía ese like
+            }
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // metodo para eliminar likes
+    static async deleteLike(id_emisor, id_receptor) {
+        const connection = await pool.getConnection();
+        try {
+            const [result] = await connection.execute(
+                'DELETE FROM likes WHERE id_emisor = ? AND id_receptor = ?',
+                [id_emisor, id_receptor]
+            );
+            return result.affectedRows === 1;
+        } finally {
+            connection.release();
+        }
+    }
+
+
+    // metodo para devolver un listado de profiles
+    static async getProfiles(user_id) {
+        const connection = await pool.getConnection();
+
+        try {
+            const [profiles] = await connection.query(
+                `SELECT * FROM profile 
+       WHERE id_user != ? AND active_profile = TRUE`,
+                [user_id]
+            );
+
+            // Si no encuentra ninguno, devuelve []
+            return profiles || [];
+
+        } catch (error) {
+            console.error('Error en HttpModel.getProfiles:', error);
+            throw error;
+
+        } finally {
+            connection.release();
+        }
+    }
+
+    static async getRooms(user_id) {
+        const connection = await pool.getConnection();
+
+        try {
+            const [rooms] = await connection.query(
+                `SELECT * FROM room 
+       WHERE user_id != ? AND active_room = TRUE`,
+                [user_id]
+            );
+
+            return rooms || [];
+
+        } catch (error) {
+            console.error('Error en HttpModel.getRooms:', error);
+            throw error;
+
+        } finally {
+            connection.release();
+        }
+    }
 
 }

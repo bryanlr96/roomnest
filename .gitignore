@@ -3,7 +3,7 @@ node_modules/
 package-lock.json
 
 # Env files
-.env
+# .env
 
 # Logs
 npm-debug.log*

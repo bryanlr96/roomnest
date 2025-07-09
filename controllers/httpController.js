@@ -19,8 +19,8 @@ export class HttpController {
   static async login(req, res) {
 
     //peticion a la bd
-    const { email, pass } = req.body
-    const result = await HttpModel.login({ email, pass })
+    const { email, password } = req.body
+    const result = await HttpModel.login({ email, password })
     if (result.success) {
       setTokenCookie(res, result.user)
       return res.json(result)
@@ -33,8 +33,8 @@ export class HttpController {
   static async register(req, res) {
 
     //peticion a la bd
-    const { email, pass, name, dni } = req.body
-    const result = await HttpModel.register({ email, pass, name, dni })
+    const { email, password, name, dni, last_connection_type } = req.body
+    const result = await HttpModel.register({ email, password, name, dni, last_connection_type })
 
     if (result.success) {//Si se puede hacer Registro añadimes el token a la cookie
       setTokenCookie(res, result.user)
@@ -46,7 +46,7 @@ export class HttpController {
   //actualizamos el usuario
   static async updateUser(req, res) {
     try {
-      const updatedUser = req.body; // Recibimos el objeto user completo (id, name, email, pass...)
+      const updatedUser = req.body; // Recibimos el objeto user completo (id, name, email, password...)
 
       if (!updatedUser.id) {
         return res.status(400).json({ success: false, message: "El id del usuario es obligatorio" });
@@ -68,7 +68,7 @@ export class HttpController {
 
   // crear perfil
   static async createProfile(req, res) {
-    const { id_user, birthdate, situation, gender, children } = req.body;
+    const { id_user, birthdate, situation, gender, children, province } = req.body;
 
     // Validar campos requeridos
     if (!id_user || !birthdate || !situation || !gender || children === undefined) {
@@ -81,7 +81,8 @@ export class HttpController {
         birthdate,
         situation,
         gender,
-        children
+        children,
+        province
       })
 
       if (!result.success) {
@@ -124,6 +125,223 @@ export class HttpController {
     } catch (error) {
       console.error('Error en HttpController.updateProfile:', error);
       return res.status(500).json({ success: false, message: "Error interno del servidor" });
+    }
+  }
+
+  // Crear habitación
+  static async createRoom(req, res) {
+    const {
+      user_id,
+      municipality,
+      street,
+      floor,
+      cp,
+      price,
+      meters,
+      tenants
+    } = req.body;
+
+    // Validar campos requeridos
+    if (
+      !user_id ||
+      !municipality ||
+      !street ||
+      floor === undefined ||
+      !cp ||
+      price === undefined ||
+      meters === undefined ||
+      tenants === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos'
+      });
+    }
+
+    try {
+      const result = await HttpModel.createRoom({
+        user_id,
+        municipality,
+        street,
+        floor,
+        cp,
+        price,
+        meters,
+        tenants
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(201).json(result);
+
+    } catch (error) {
+      console.error('Error en createRoom:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  static async updateRoom(req, res) {
+    try {
+      const updatedRoom = req.body;
+
+      if (!updatedRoom.id) {
+        return res.status(400).json({ success: false, message: "El id de la habitación es obligatorio" });
+      }
+
+      // Excluir campos no editables
+      const {
+        id,
+        user_id,
+        municipality,
+        street,
+        floor,
+        cp,
+        meters,
+        ...editableFields
+      } = updatedRoom;
+
+      if (Object.keys(editableFields).length === 0) {
+        return res.status(400).json({ success: false, message: "No hay campos para actualizar" });
+      }
+
+      // Crear objeto con id + campos editables
+      const dataToUpdate = { id, ...editableFields };
+
+      const result = await HttpModel.updateRoom(dataToUpdate);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.json(result);
+
+    } catch (error) {
+      console.error('Error en HttpController.updateRoom:', error);
+      return res.status(500).json({ success: false, message: "Error interno del servidor" });
+    }
+  }
+
+  // Enviar like
+  static async sendLike(req, res) {
+    const { id_emisor, id_receptor } = req.body;
+
+    if (!id_emisor || !id_receptor) {
+      return res.status(400).json({ success: false, message: 'Faltan datos obligatorios' });
+    }
+
+    try {
+      // Validar que ambos IDs existan
+      const emisorExists = await HttpModel.checkIdExists(id_emisor);
+      const receptorExists = await HttpModel.checkIdExists(id_receptor);
+
+      if (!emisorExists || !receptorExists) {
+        return res.status(400).json({ success: false, message: 'ID emisor o receptor no existe' });
+      }
+
+      // Insertar like
+      const inserted = await HttpModel.insertLike(id_emisor, id_receptor);
+      if (!inserted) {
+        return res.status(409).json({ success: false, message: 'Ya existe un like de este emisor a este receptor' });
+      }
+
+      return res.json({ success: true, message: 'Like enviado correctamente' });
+    } catch (error) {
+      console.error('Error en sendLike:', error);
+      return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+  }
+
+  static async deleteLike(req, res) {
+    const { id_emisor, id_receptor } = req.body;
+
+    if (!id_emisor || !id_receptor) {
+      return res.status(400).json({ success: false, message: 'Faltan datos obligatorios' });
+    }
+
+    try {
+      // Validar que ambos IDs existan
+      const emisorExists = await HttpModel.checkIdExists(id_emisor);
+      const receptorExists = await HttpModel.checkIdExists(id_receptor);
+
+      if (!emisorExists || !receptorExists) {
+        return res.status(400).json({ success: false, message: 'ID emisor o receptor no existe' });
+      }
+
+      // Eliminar like
+      const deleted = await HttpModel.deleteLike(id_emisor, id_receptor);
+      if (!deleted) {
+        return res.status(409).json({ success: false, message: 'No existe like para eliminar' });
+      }
+
+      return res.json({ success: true, message: 'Like eliminado correctamente' });
+    } catch (error) {
+      console.error('Error en deleteLike:', error);
+      return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+  }
+
+  static async getProfiles(req, res) {
+    const { user_id } = req.body;
+
+  }
+
+
+  static async getProfiles(req, res) {
+    try {
+      const { user_id } = req.body;
+
+      if (!user_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'El user_id es obligatorio'
+        });
+      }
+
+      const profiles = await HttpModel.getProfiles(user_id);
+
+      return res.json({
+        success: true,
+        profiles
+      });
+
+    } catch (error) {
+      console.error('Error en HttpController.getProfiles:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  static async getRooms(req, res) {
+    try {
+      const { user_id } = req.body;
+
+      if (!user_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'El user_id es obligatorio'
+        });
+      }
+
+      const rooms = await HttpModel.getRooms(user_id);
+
+      return res.json({
+        success: true,
+        rooms
+      });
+
+    } catch (error) {
+      console.error('Error en HttpController.getRooms:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
     }
   }
 
