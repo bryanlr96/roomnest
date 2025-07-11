@@ -33,7 +33,7 @@ router.post('/sendLike', HttpController.sendLike);
 router.delete('/deleteLike', HttpController.deleteLike);
 
 //peticion para pedilr los Perfiles
-router.get('/getProfiles', HttpController.getProfiles)
+router.post('/getProfiles', HttpController.getProfiles)
 
 // peticion para pedir las rooms
 router.post('/getRooms', HttpController.getRooms)

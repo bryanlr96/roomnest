@@ -251,7 +251,7 @@ export class HttpModel {
                 'admit_couples', 'admit_minors', 'air_conditioning', 'padron',
                 'furnished', 'elevator', 'private_bathroom',
                 'double_room', 'single_room', 'heating', 'professional_cleaning',
-                'street_view', 'balcony'
+                'street_view', 'balcony', 'terrace',
             ];
 
             const updateFields = [];
@@ -390,7 +390,7 @@ export class HttpModel {
                 'admit_couples', 'admit_minors', 'air_conditioning', 'padron',
                 'furnished', 'elevator', 'private_bathroom',
                 'double_room', 'single_room', 'heating', 'professional_cleaning',
-                'street_view', 'balcony'
+                'street_view', 'balcony', 'terrace'
             ];
 
             const updateFields = [];
