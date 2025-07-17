@@ -7,6 +7,50 @@ const pool = createPool(); // Creamos el pool una vez
 
 export class HttpModel {
 
+    //metodo estatico para el reload
+    static async getAllByUserId(userId) {
+        const connection = await pool.getConnection();
+
+        try {
+            // 1️⃣ Buscar el usuario
+            const [users] = await connection.query(
+                `SELECT id, email, name, dni, last_connection_type FROM users WHERE id = ?;`,
+                [userId]
+            );
+
+            if (users.length === 0) {
+                return { success: false, message: "Usuario no encontrado" };
+            }
+
+            const user = users[0];
+
+            // 2️⃣ Buscar el perfil
+            const [profiles] = await connection.query(
+                `SELECT * FROM profile WHERE id_user = ?;`,
+                [user.id]
+            );
+            const profile = profiles.length > 0 ? profiles[0] : {};
+
+            // 3️⃣ Buscar las rooms
+            const [rooms] = await connection.query(
+                `SELECT * FROM room WHERE user_id = ?;`,
+                [user.id]
+            );
+            const userRooms = rooms.length > 0 ? rooms : [];
+
+            return { success: true, user, profile, rooms: userRooms };
+
+        } catch (error) {
+            console.error('Error en getAllByUserId:', error);
+            return { success: false, message: "Error interno del servidor" };
+        } finally {
+            connection.release();
+        }
+    }
+
+
+
+    // metodo estatico para el login
     static async login({ email, password }) {
         const connection = await pool.getConnection(); // Obtener una conexión del pool
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import { HttpController } from '../controllers/httpController.js';
+import upload from '../middleware/uploadImage.js';
 const router = express.Router();
 
 //ruta para regargar
@@ -37,6 +38,9 @@ router.post('/getProfiles', HttpController.getProfiles)
 
 // peticion para pedir las rooms
 router.post('/getRooms', HttpController.getRooms)
+
+// peticion para subir imagenes
+router.post('/uploadRoomImage', upload.array("roomImages", 99), HttpController.uploadRoomImage)
 
 //peticion para el logout
 router.post('/logout', HttpController.logout)

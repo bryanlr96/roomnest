@@ -1,23 +1,24 @@
 import { HttpModel } from '../models/mySQL/http.js';
 import { setTokenCookie } from '../utils/tokenUtils.js';
-
-
+import path from "path";
+import fs from "fs";
 
 export class HttpController {
 
   // Reenviar el usuario si se recarga la pagina
   static async reload(req, res) {
     const { user } = req.session
-    let result = { success: false }
-
-    if (user) result = { success: true, user }
-    res.json(result)
+    if (user) {
+      const result = await HttpModel.getAllByUserId(user.id)
+      res.json(result)
+    } else {
+      res.json({ success: false, message: "No user session" })
+    }
   }
 
 
   // Login
   static async login(req, res) {
-
     //peticion a la bd
     const { email, password } = req.body
     const result = await HttpModel.login({ email, password })
@@ -345,6 +346,36 @@ export class HttpController {
     }
   }
 
+
+  static async uploadRoomImage(req, res) {
+    const { roomId } = req.body;
+
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ success: false, message: 'No se envió imagen' });
+      }
+
+      if (!roomId) {
+        return res.status(400).json({ success: false, message: 'Falta roomId' });
+      }
+
+      // Array con las rutas relativas de las imágenes subidas
+      const imagePaths = req.files.map(file =>
+        path.join('/imagenes/rooms/', roomId, file.filename)
+      );
+
+      await HttpModel.saveImagesForReference(roomId, 'room', imagePaths);
+
+      return res.status(200).json({
+        success: true,
+        imagePaths,
+        message: 'Imágenes subidas correctamente'
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, message: 'Error al subir imagen' });
+    }
+  }
 
   //Logout
   static async logout(req, res) {

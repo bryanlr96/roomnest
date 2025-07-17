@@ -19,6 +19,7 @@ app.get("/", (req, res) => {
 app.use(express.json());
 app.use(cookieParser());
 app.get("*", addSession);
+app.use('/imagenes', express.static('imagenes'));
 
 // Rutas HTTP
 app.use('/', loginRoutes);
