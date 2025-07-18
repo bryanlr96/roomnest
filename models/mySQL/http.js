@@ -29,14 +29,37 @@ export class HttpModel {
                 `SELECT * FROM profile WHERE id_user = ?;`,
                 [user.id]
             );
-            const profile = profiles.length > 0 ? profiles[0] : {};
 
-            // 3️⃣ Buscar las rooms
+            let profile = profiles.length > 0 ? profiles[0] : null;
+
+            // 3️⃣ Añadir imágenes si hay perfil
+            if (profile) {
+                const [profileImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'profile' AND id_reference = ?;`,
+                    [String(profile.id)]
+                );
+
+                profile.images = profileImages.map(img => img.url);
+            }
+
+            // 4️⃣ Buscar las rooms
             const [rooms] = await connection.query(
                 `SELECT * FROM room WHERE user_id = ?;`,
                 [user.id]
             );
-            const userRooms = rooms.length > 0 ? rooms : [];
+
+            const userRooms = [];
+
+            // 5️⃣ Añadir imágenes a cada room
+            for (const room of rooms) {
+                const [roomImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?;`,
+                    [String(room.id)]
+                );
+
+                room.images = roomImages.map(img => img.url);
+                userRooms.push(room);
+            }
 
             return { success: true, user, profile, rooms: userRooms };
 
@@ -48,13 +71,12 @@ export class HttpModel {
         }
     }
 
-
-
     // metodo estatico para el login
     static async login({ email, password }) {
-        const connection = await pool.getConnection(); // Obtener una conexión del pool
+        const connection = await pool.getConnection();
 
         try {
+            // 1️⃣ Buscar al usuario
             const [users] = await connection.query(
                 `SELECT id, email, password, name, dni, last_connection_type FROM users WHERE email = ?;`,
                 [email]
@@ -71,17 +93,42 @@ export class HttpModel {
                 return { success: false, message: "Contraseña incorrecta" };
             }
 
+            // 2️⃣ Buscar el perfil
             const [profiles] = await connection.query(
                 `SELECT * FROM profile WHERE id_user = ?;`,
                 [user.id]
             );
-            const profile = profiles.length > 0 ? profiles[0] : {};
 
+            let profile = profiles.length > 0 ? profiles[0] : null;
+
+            // 3️⃣ Añadir imágenes al perfil si existe
+            if (profile) {
+                const [profileImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'profile' AND id_reference = ?;`,
+                    [String(profile.id)]
+                );
+
+                profile.images = profileImages.map(img => img.url);
+            }
+
+            // 4️⃣ Buscar rooms
             const [rooms] = await connection.query(
                 `SELECT * FROM room WHERE user_id = ?;`,
                 [user.id]
             );
-            const userRooms = rooms.length > 0 ? rooms : [];
+
+            const userRooms = [];
+
+            // 5️⃣ Añadir imágenes a cada room
+            for (const room of rooms) {
+                const [roomImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?;`,
+                    [String(room.id)]
+                );
+
+                room.images = roomImages.map(img => img.url);
+                userRooms.push(room);
+            }
 
             return { success: true, user, profile, rooms: userRooms };
 
@@ -250,6 +297,7 @@ export class HttpModel {
             );
 
             const profile = profiles[0];
+            profile.images = [];
             return { success: true, profile };
 
         } catch (error) {
@@ -326,7 +374,15 @@ export class HttpModel {
                 [id]
             );
 
-            return { success: true, profile: updatedProfiles[0] };
+            const profile = updatedProfiles[0]
+            const [profileImages] = await connection.query(
+                `SELECT url FROM images WHERE reference_type = 'profile' AND id_reference = ?`,
+                [id]
+            );
+
+            profile.images = profileImages.map(img => img.url);
+
+            return { success: true, profile };
 
         } catch (error) {
             console.error('Error actualizando perfil:', error);
@@ -337,10 +393,10 @@ export class HttpModel {
     }
 
 
-    // Crear una habitación
     static async createRoom(roomData) {
         const {
             user_id,
+            province,
             municipality,
             street,
             floor,
@@ -353,14 +409,15 @@ export class HttpModel {
         const connection = await pool.getConnection();
         const newRoomId = uuidv4();
         try {
-            // Generar un UUID para la nueva habitación
-            const [result] = await connection.execute(
+            // Insertar la nueva habitación
+            await connection.execute(
                 `INSERT INTO room 
-                (id, user_id, municipality, street, floor, cp, price, meters, tenants)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, user_id, province, municipality, street, floor, cp, price, meters, tenants)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     newRoomId,
                     user_id,
+                    province,
                     municipality,
                     street,
                     floor,
@@ -372,21 +429,36 @@ export class HttpModel {
             );
 
             // Obtener la habitación recién creada
-            const [room] = await connection.query(
+            const [roomResult] = await connection.query(
                 `SELECT * FROM room WHERE id = ?`,
                 [newRoomId]
             );
+            const room = roomResult[0];
+
+            // Añadir array de imágenes vacío (ya que es nueva)
+            room.images = [];
 
             // Obtener todas las habitaciones del usuario
-            const [rooms] = await connection.query(
+            const [roomsResult] = await connection.query(
                 `SELECT * FROM room WHERE user_id = ?`,
                 [user_id]
             );
 
+            const rooms = roomsResult.length > 0 ? roomsResult : [];
+
+            // Para cada habitación obtener sus imágenes y añadirlas como array
+            for (const r of rooms) {
+                const [roomImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?`,
+                    [r.id]
+                );
+                r.images = roomImages.map(img => img.url);
+            }
+
             return {
                 success: true,
-                room: room[0],
-                rooms: rooms || []
+                room,
+                rooms
             };
 
         } catch (error) {
@@ -458,19 +530,38 @@ export class HttpModel {
                 updateValues
             );
 
-            const [updatedRoom] = await connection.query(
+            // Obtener la habitación actualizada
+            const [updatedRoomResult] = await connection.query(
                 `SELECT * FROM room WHERE id = ?`,
                 [id]
             );
+            const updatedRoomData = updatedRoomResult[0];
 
-            const userIdFromRoom = updatedRoom[0].user_id;
+            // Obtener imágenes para la habitación actualizada
+            const [updatedRoomImages] = await connection.query(
+                `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?`,
+                [updatedRoomData.id]
+            );
+            updatedRoomData.images = updatedRoomImages.map(img => img.url);
 
-            const [updatedRooms] = await connection.query(
+            // Obtener todas las habitaciones del usuario
+            const [updatedRoomsResult] = await connection.query(
                 `SELECT * FROM room WHERE user_id = ?`,
-                [userIdFromRoom]
+                [updatedRoomData.user_id]
             );
 
-            return { success: true, room: updatedRoom[0], rooms: updatedRooms };
+            const updatedRooms = updatedRoomsResult.length > 0 ? updatedRoomsResult : [];
+
+            // Obtener imágenes para cada habitación
+            for (const r of updatedRooms) {
+                const [roomImages] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?`,
+                    [r.id]
+                );
+                r.images = roomImages.map(img => img.url);
+            }
+
+            return { success: true, room: updatedRoomData, rooms: updatedRooms };
 
         } catch (error) {
             console.error('Error actualizando habitación:', error);
@@ -479,6 +570,7 @@ export class HttpModel {
             connection.release();
         }
     }
+
 
     // antes de enviar el like se comprueba que existan los ids
     static async checkIdExists(id) {
@@ -530,19 +622,30 @@ export class HttpModel {
     }
 
 
-    // metodo para devolver un listado de profiles
     static async getProfiles(user_id) {
         const connection = await pool.getConnection();
 
         try {
             const [profiles] = await connection.query(
                 `SELECT * FROM profile 
-       WHERE id_user != ? AND active_profile = TRUE`,
+             WHERE id_user != ? AND active_profile = TRUE`,
                 [user_id]
             );
 
-            // Si no encuentra ninguno, devuelve []
-            return profiles || [];
+            if (!profiles || profiles.length === 0) {
+                return [];
+            }
+
+            // Obtener imágenes para cada profile
+            for (const profile of profiles) {
+                const [images] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'profile' AND id_reference = ?`,
+                    [profile.id]
+                );
+                profile.images = images.map(img => img.url);
+            }
+
+            return profiles;
 
         } catch (error) {
             console.error('Error en HttpModel.getProfiles:', error);
@@ -553,22 +656,65 @@ export class HttpModel {
         }
     }
 
+
     static async getRooms(user_id) {
         const connection = await pool.getConnection();
 
         try {
             const [rooms] = await connection.query(
                 `SELECT * FROM room 
-       WHERE user_id != ? AND active_room = TRUE`,
+             WHERE user_id != ? AND active_room = TRUE`,
                 [user_id]
             );
 
-            return rooms || [];
+            if (!rooms || rooms.length === 0) {
+                return [];
+            }
+
+            // Añadir array de imágenes a cada room
+            for (const room of rooms) {
+                const [images] = await connection.query(
+                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?`,
+                    [room.id]
+                );
+                room.images = images.map(img => img.url);
+            }
+
+            return rooms;
 
         } catch (error) {
             console.error('Error en HttpModel.getRooms:', error);
             throw error;
 
+        } finally {
+            connection.release();
+        }
+    }
+
+
+
+    static async saveImagesForReference(id_reference, reference_type, imagePaths, userId) {
+        const connection = await pool.getConnection();
+
+        try {
+            // Validar tipo de referencia
+            if (!['room', 'profile'].includes(reference_type)) {
+                return { success: false, message: 'Tipo de referencia inválido' };
+            }
+
+            // Preparar los datos para inserción masiva
+            const values = imagePaths.map(url => [uuidv4(), id_reference, reference_type, url]);
+
+            await connection.query(
+                `INSERT INTO images (id, id_reference, reference_type, url) VALUES ?`,
+                [values]
+            );
+
+            return await this.getAllByUserId(userId);
+
+        } catch (error) {
+            console.error('Error en saveImagesForReference:', error);
+            return { success: false, message: 'Error al guardar las imágenes' };
         } finally {
             connection.release();
         }

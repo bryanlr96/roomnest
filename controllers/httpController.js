@@ -133,6 +133,7 @@ export class HttpController {
   static async createRoom(req, res) {
     const {
       user_id,
+      province,
       municipality,
       street,
       floor,
@@ -145,6 +146,7 @@ export class HttpController {
     // Validar campos requeridos
     if (
       !user_id ||
+      !province ||
       !municipality ||
       !street ||
       floor === undefined ||
@@ -162,6 +164,7 @@ export class HttpController {
     try {
       const result = await HttpModel.createRoom({
         user_id,
+        province,
         municipality,
         street,
         floor,
@@ -348,8 +351,8 @@ export class HttpController {
 
 
   static async uploadRoomImage(req, res) {
-    const { roomId } = req.body;
-
+    const {userId, roomId } = req.body;
+    
     try {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: 'No se envió imagen' });
@@ -364,13 +367,9 @@ export class HttpController {
         path.join('/imagenes/rooms/', roomId, file.filename)
       );
 
-      await HttpModel.saveImagesForReference(roomId, 'room', imagePaths);
+      const result = await HttpModel.saveImagesForReference(roomId, 'room', imagePaths, userId);
+      res.json(result); // ← Devuelve todo directamente desde getAllByUserId
 
-      return res.status(200).json({
-        success: true,
-        imagePaths,
-        message: 'Imágenes subidas correctamente'
-      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, message: 'Error al subir imagen' });
