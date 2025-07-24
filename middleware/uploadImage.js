@@ -4,12 +4,18 @@ import path from 'path';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const { roomId } = req.body;  // O podrías obtenerlo de req.params o donde lo envíes
-    if (!roomId) {
+    const { roomId, profileId } = req.body;
+    if (!roomId && !profileId) {
       return cb(new Error('Falta roomId'), null);
     }
 
-    const dir = path.join('imagenes', 'rooms', roomId);
+    let dir = "";
+    if(!profileId){
+      dir = path.join('imagenes', 'rooms', roomId);
+    }else{
+      dir = path.join('imagenes', 'profiles', profileId);
+    }
+    
 
     // Crear carpeta si no existe (de forma recursiva)
     fs.mkdirSync(dir, { recursive: true });

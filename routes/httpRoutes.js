@@ -39,8 +39,11 @@ router.post('/getProfiles', HttpController.getProfiles)
 // peticion para pedir las rooms
 router.post('/getRooms', HttpController.getRooms)
 
-// peticion para subir imagenes
+// peticion para subir imagenes (Habitacion)
 router.post('/uploadRoomImage', upload.array("roomImages", 99), HttpController.uploadRoomImage)
+
+// peticion para subir imagenes (perfil)
+router.post('/uploadProfileImage', upload.array("profileImages", 99), HttpController.uploadProfileImage)
 
 //peticion para el logout
 router.post('/logout', HttpController.logout)

@@ -255,7 +255,7 @@ export class HttpModel {
     }
 
     // crear perfil
-    static async createProfile({ id_user, birthdate, situation, gender, children, province }) {
+    static async createProfile({ id_user, birthdate, situation, gender, children, province, profileDescription }) {
         const connection = await pool.getConnection();
 
         try {
@@ -282,10 +282,10 @@ export class HttpModel {
             // Insertar perfil nuevo
             await connection.execute(
                 `
-          INSERT INTO profile (id, id_user, birthdate, situation, gender, children, province)
-          VALUES (UUID(), ?, ?, ?, ?, ?,?);
+          INSERT INTO profile (id, id_user, birthdate, situation, gender, children, province, profileDescription)
+          VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?);
         `,
-                [id_user, birthdate, situation, gender, children, province]
+                [id_user, birthdate, situation, gender, children, province, profileDescription]
             );
 
             // Traer el perfil recién creado
@@ -335,6 +335,7 @@ export class HttpModel {
                 'gender',
                 'children',
                 'provience',
+                'profileDescription',
                 // Campos de convivencia
                 'smoker', 'pets', 'only_girls', 'only_boys', 'lgbt_friendly',
                 'calm_environment', 'party_friendly',
@@ -403,7 +404,8 @@ export class HttpModel {
             cp,
             price,
             meters,
-            tenants
+            tenants,
+            roomDescription
         } = roomData;
 
         const connection = await pool.getConnection();
@@ -412,8 +414,8 @@ export class HttpModel {
             // Insertar la nueva habitación
             await connection.execute(
                 `INSERT INTO room 
-            (id, user_id, province, municipality, street, floor, cp, price, meters, tenants)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, user_id, province, municipality, street, floor, cp, price, meters, tenants, roomDescription)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     newRoomId,
                     user_id,
@@ -424,7 +426,8 @@ export class HttpModel {
                     cp,
                     price,
                     meters,
-                    tenants
+                    tenants,
+                    roomDescription
                 ]
             );
 
@@ -501,6 +504,7 @@ export class HttpModel {
             const allowedFields = [
                 'price',
                 'tenants',
+                'roomDescription',
                 'smoker', 'pets', 'only_girls', 'only_boys', 'lgbt_friendly',
                 'calm_environment', 'party_friendly',
                 'admit_couples', 'admit_minors', 'air_conditioning', 'padron',

@@ -69,7 +69,7 @@ export class HttpController {
 
   // crear perfil
   static async createProfile(req, res) {
-    const { id_user, birthdate, situation, gender, children, province } = req.body;
+    const { id_user, birthdate, situation, gender, children, province, profileDescription } = req.body;
 
     // Validar campos requeridos
     if (!id_user || !birthdate || !situation || !gender || children === undefined) {
@@ -83,7 +83,8 @@ export class HttpController {
         situation,
         gender,
         children,
-        province
+        province,
+        profileDescription
       })
 
       if (!result.success) {
@@ -140,7 +141,8 @@ export class HttpController {
       cp,
       price,
       meters,
-      tenants
+      tenants,
+      roomDescription
     } = req.body;
 
     // Validar campos requeridos
@@ -171,7 +173,8 @@ export class HttpController {
         cp,
         price,
         meters,
-        tenants
+        tenants, 
+        roomDescription
       });
 
       if (!result.success) {
@@ -351,8 +354,7 @@ export class HttpController {
 
 
   static async uploadRoomImage(req, res) {
-    const {userId, roomId } = req.body;
-    
+    const { userId, roomId } = req.body;
     try {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: 'No se envió imagen' });
@@ -370,6 +372,28 @@ export class HttpController {
       const result = await HttpModel.saveImagesForReference(roomId, 'room', imagePaths, userId);
       res.json(result); // ← Devuelve todo directamente desde getAllByUserId
 
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, message: 'Error al subir imagen' });
+    }
+  }
+
+    static async uploadProfileImage(req, res) {
+    const { userId, profileId } = req.body;
+
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ success: false, message: 'No se envió imagen' });
+      }
+      if (!profileId) {
+        return res.status(400).json({ success: false, message: 'Falta profile' });
+      }
+      // Array con las rutas relativas de las imágenes subidas
+      const imagePaths = req.files.map(file =>
+        path.join('/imagenes/profiles/', profileId, file.filename)
+      );
+      const result = await HttpModel.saveImagesForReference(profileId, 'profile', imagePaths, userId);
+      res.json(result); // ← Devuelve todo directamente desde getAllByUserId
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, message: 'Error al subir imagen' });
