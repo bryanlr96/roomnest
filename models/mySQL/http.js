@@ -626,13 +626,12 @@ export class HttpModel {
     }
 
 
-    static async getProfiles(user_id) {
+    static async getProfiles(user_id, roomId) {
         const connection = await pool.getConnection();
-
         try {
             const [profiles] = await connection.query(
                 `SELECT * FROM profile 
-             WHERE id_user != ? AND active_profile = TRUE`,
+                WHERE id_user != ? AND active_profile = TRUE`,
                 [user_id]
             );
 
@@ -640,13 +639,23 @@ export class HttpModel {
                 return [];
             }
 
-            // Obtener imágenes para cada profile
             for (const profile of profiles) {
+                // Añadir imágenes
                 const [images] = await connection.query(
-                    `SELECT url FROM images WHERE reference_type = 'profile' AND id_reference = ?`,
+                    `SELECT url FROM images 
+                    WHERE reference_type = 'profile' AND id_reference = ?`,
                     [profile.id]
                 );
                 profile.images = images.map(img => img.url);
+
+                // Comprobar si el perfil ha dado like a la room
+                const [likes] = await connection.query(
+                    `SELECT 1 FROM likes 
+                    WHERE id_emisor = ? AND id_receptor = ? 
+                    LIMIT 1`,
+                    [roomId, profile.id]
+                );
+                profile.liked = likes.length > 0;
             }
 
             return profiles;
@@ -661,13 +670,13 @@ export class HttpModel {
     }
 
 
-    static async getRooms(user_id) {
+    static async getRooms(user_id, profileId) {
         const connection = await pool.getConnection();
 
         try {
             const [rooms] = await connection.query(
                 `SELECT * FROM room 
-             WHERE user_id != ? AND active_room = TRUE`,
+                WHERE user_id != ? AND active_room = TRUE`,
                 [user_id]
             );
 
@@ -675,13 +684,23 @@ export class HttpModel {
                 return [];
             }
 
-            // Añadir array de imágenes a cada room
             for (const room of rooms) {
+                // Añadir imágenes
                 const [images] = await connection.query(
-                    `SELECT url FROM images WHERE reference_type = 'room' AND id_reference = ?`,
+                    `SELECT url FROM images 
+                    WHERE reference_type = 'room' AND id_reference = ?`,
                     [room.id]
                 );
                 room.images = images.map(img => img.url);
+
+                // Comprobar si el perfil le ha dado like
+                const [likes] = await connection.query(
+                    `SELECT 1 FROM likes 
+                    WHERE id_emisor = ? AND id_receptor = ? 
+                    LIMIT 1`,
+                    [profileId, room.id]
+                );
+                room.liked = likes.length > 0;
             }
 
             return rooms;
@@ -724,4 +743,28 @@ export class HttpModel {
         }
     }
 
+
+    static async getRoomMatch(roomId) {
+        const [rows] = await pool.execute(
+            `SELECT p.*, u.name, u.email
+            FROM matches m
+            JOIN profile p ON m.id_profile = p.id
+            JOIN users u ON p.id_user = u.id
+            WHERE m.id_room = ? AND m.active_match = TRUE`,
+            [roomId]
+        );
+        return rows;
+    }
+
+
+    static async getProfileMatch(profileId) {
+        const [rows] = await pool.execute(
+            `SELECT r.*
+            FROM matches m
+            JOIN room r ON m.id_room = r.id
+            WHERE m.id_profile = ? AND m.active_match = TRUE;`,
+            [profileId]
+        );
+        return rows;
+    }
 }

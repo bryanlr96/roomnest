@@ -256,7 +256,7 @@ export class HttpController {
         return res.status(409).json({ success: false, message: 'Ya existe un like de este emisor a este receptor' });
       }
 
-      return res.json({ success: true, message: 'Like enviado correctamente' });
+      return res.json({ success: true});
     } catch (error) {
       console.error('Error en sendLike:', error);
       return res.status(500).json({ success: false, message: 'Error interno del servidor' });
@@ -278,30 +278,23 @@ export class HttpController {
       if (!emisorExists || !receptorExists) {
         return res.status(400).json({ success: false, message: 'ID emisor o receptor no existe' });
       }
-
       // Eliminar like
       const deleted = await HttpModel.deleteLike(id_emisor, id_receptor);
       if (!deleted) {
         return res.status(409).json({ success: false, message: 'No existe like para eliminar' });
       }
 
-      return res.json({ success: true, message: 'Like eliminado correctamente' });
+      return res.json({ success: true});
     } catch (error) {
       console.error('Error en deleteLike:', error);
       return res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
   }
 
-  static async getProfiles(req, res) {
-    const { user_id } = req.body;
-
-  }
-
 
   static async getProfiles(req, res) {
     try {
-      const { user_id } = req.body;
-
+      const { user_id, roomId } = req.body;
       if (!user_id) {
         return res.status(400).json({
           success: false,
@@ -309,7 +302,7 @@ export class HttpController {
         });
       }
 
-      const profiles = await HttpModel.getProfiles(user_id);
+      const profiles = await HttpModel.getProfiles(user_id, roomId);
 
       return res.json({
         success: true,
@@ -327,7 +320,7 @@ export class HttpController {
 
   static async getRooms(req, res) {
     try {
-      const { user_id } = req.body;
+      const { user_id, profileId } = req.body;
 
       if (!user_id) {
         return res.status(400).json({
@@ -336,7 +329,7 @@ export class HttpController {
         });
       }
 
-      const rooms = await HttpModel.getRooms(user_id);
+      const rooms = await HttpModel.getRooms(user_id, profileId);
 
       return res.json({
         success: true,
@@ -398,6 +391,23 @@ export class HttpController {
       console.error(error);
       return res.status(500).json({ success: false, message: 'Error al subir imagen' });
     }
+  }
+
+  static async getMatch(req, res){
+    const {roomId, profileId} = req.body;
+    let result = []
+    if(!roomId && profileId){
+      return res.status(400).json({ success: false, message: 'No se envió id' });
+    }
+
+    if(!profileId){
+      result = await HttpModel.getRoomMatch(roomId);        
+      
+    }else{
+      result= await HttpModel.getProfileMatch(profileId)
+    }
+
+    res.json({success:true, match: result})
   }
 
   //Logout

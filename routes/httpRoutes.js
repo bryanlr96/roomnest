@@ -45,6 +45,9 @@ router.post('/uploadRoomImage', upload.array("roomImages", 99), HttpController.u
 // peticion para subir imagenes (perfil)
 router.post('/uploadProfileImage', upload.array("profileImages", 99), HttpController.uploadProfileImage)
 
+//peticion para obtener un listado de match
+router.post('/getMatch', HttpController.getMatch)
+
 //peticion para el logout
 router.post('/logout', HttpController.logout)
 
