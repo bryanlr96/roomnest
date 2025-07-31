@@ -48,6 +48,12 @@ router.post('/uploadProfileImage', upload.array("profileImages", 99), HttpContro
 //peticion para obtener un listado de match
 router.post('/getMatch', HttpController.getMatch)
 
+//peticion para cambiar el last_connection_type  a room
+router.post('/profiletoroom', HttpController.profiletoroom)
+
+//peticion para cambiar el last_connection_type  a room
+router.post('/roomtoprofile', HttpController.roomtoprofile)
+
 //peticion para el logout
 router.post('/logout', HttpController.logout)
 

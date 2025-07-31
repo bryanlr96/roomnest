@@ -630,8 +630,10 @@ export class HttpModel {
         const connection = await pool.getConnection();
         try {
             const [profiles] = await connection.query(
-                `SELECT * FROM profile 
-                WHERE id_user != ? AND active_profile = TRUE`,
+                `SELECT p.*, u.name
+                FROM profile p
+                JOIN users u ON p.id_user = u.id
+                WHERE p.id_user != ? AND p.active_profile = TRUE`,
                 [user_id]
             );
 
@@ -746,11 +748,18 @@ export class HttpModel {
 
     static async getRoomMatch(roomId) {
         const [rows] = await pool.execute(
-            `SELECT p.*, u.name, u.email
+            `SELECT 
+            ANY_VALUE(m.id) AS matchId,
+            p.*, 
+            u.name, 
+            u.email,
+            JSON_ARRAYAGG(i.url) AS images
             FROM matches m
             JOIN profile p ON m.id_profile = p.id
             JOIN users u ON p.id_user = u.id
-            WHERE m.id_room = ? AND m.active_match = TRUE`,
+            LEFT JOIN images i ON i.id_reference = p.id AND i.reference_type = 'profile'
+            WHERE m.id_room = ? AND m.active_match = TRUE
+            GROUP BY p.id`,
             [roomId]
         );
         return rows;
@@ -759,12 +768,62 @@ export class HttpModel {
 
     static async getProfileMatch(profileId) {
         const [rows] = await pool.execute(
-            `SELECT r.*
+            `SELECT 
+            ANY_VALUE(m.id) AS matchId,
+            r.*, 
+            JSON_ARRAYAGG(i.url) AS images
             FROM matches m
             JOIN room r ON m.id_room = r.id
-            WHERE m.id_profile = ? AND m.active_match = TRUE;`,
+            LEFT JOIN images i ON i.id_reference = r.id AND i.reference_type = 'room'
+            WHERE m.id_profile = ? AND m.active_match = TRUE
+            GROUP BY r.id`,
             [profileId]
         );
         return rows;
+    }
+
+
+    static async profiletoroom(userId) {
+        try {
+            const [result] = await pool.execute(
+                'UPDATE users SET last_connection_type = ? WHERE id = ?',
+                ['room', userId]
+            );
+
+            return {
+                success: result.affectedRows > 0,
+                message: result.affectedRows > 0
+                    ? 'Tipo de conexión actualizado a room.'
+                    : 'Usuario no encontrado.'
+            };
+        } catch (error) {
+            console.error('Error en profiletoroom:', error);
+            return {
+                success: false,
+                message: 'Error al actualizar el tipo de conexión.'
+            };
+        }
+    }
+
+    static async roomtoprofile(userId) {
+        try {
+            const [result] = await pool.execute(
+                'UPDATE users SET last_connection_type = ? WHERE id = ?',
+                ['profile', userId]
+            );
+
+            return {
+                success: result.affectedRows > 0,
+                message: result.affectedRows > 0
+                    ? 'Tipo de conexión actualizado a room.'
+                    : 'Usuario no encontrado.'
+            };
+        } catch (error) {
+            console.error('Error en profiletoroom:', error);
+            return {
+                success: false,
+                message: 'Error al actualizar el tipo de conexión.'
+            };
+        }
     }
 }

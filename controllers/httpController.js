@@ -396,18 +396,35 @@ export class HttpController {
   static async getMatch(req, res){
     const {roomId, profileId} = req.body;
     let result = []
-    if(!roomId && profileId){
+    if(!roomId && !profileId){
       return res.status(400).json({ success: false, message: 'No se envió id' });
     }
 
     if(!profileId){
-      result = await HttpModel.getRoomMatch(roomId);        
+      result = await HttpModel.getRoomMatch(roomId);  
       
     }else{
       result= await HttpModel.getProfileMatch(profileId)
     }
 
     res.json({success:true, match: result})
+  }
+
+  static async profiletoroom(req, res){
+    const {userId} = req.body
+    if(!userId)return res.status(400).json({ success: false, message: 'No se envió id' });
+    
+    const result = await HttpModel.profiletoroom(userId)
+    res.json(result)
+  }
+
+
+   static async roomtoprofile(req, res){
+    const {userId} = req.body
+    if(!userId)return res.status(400).json({ success: false, message: 'No se envió id' });
+    
+    const result = await HttpModel.roomtoprofile(userId)
+    res.json(result)
   }
 
   //Logout
