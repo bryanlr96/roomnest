@@ -14,10 +14,11 @@ export function generateToken(user) {
 }
 
 export function setTokenCookie(res, user) {
+    
     const token = generateToken(user);
     res.cookie('access_token', token, {
         httpOnly: true,
-        secure: 'production',
-        sameSite: 'None'
+        secure: false,
+        sameSite: 'Lax'
     })
 }
